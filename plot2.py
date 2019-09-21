@@ -10,11 +10,14 @@ import scipy.stats as ss
 register_matplotlib_converters()
 
 
+# import database credentials from the environment
 host = os.getenv('RDS_HOST')
 port = os.getenv('RDS_PORT')
 database = os.getenv('RDS_DATABASE')
 user = os.getenv('RDS_USER')
 password = os.getenv('RDS_PASSWORD')
+
+# connect to the database
 conn = pg.connect(host=host, port=port, database=database, user=user, password=password)
 cur = conn.cursor()
 
@@ -28,18 +31,20 @@ SELECT start::time start_time,
     EXTRACT( week FROM "end"::date -1 )::int2 "week",
     "end"::date-1 "date"
 FROM sleep
-WHERE NOW()-("end"::date-1) < INTERVAL '6 months' AND user_id LIKE '7B%' AND "end"-start > INTERVAL '3.5 hours'
+WHERE NOW()-("end"::date-1) < INTERVAL '6 months' 
+AND user_id LIKE '7B%' 
+AND "end"-start > INTERVAL '3.5 hours'
 ORDER BY start;
 """
 
+# query and fetch the database
 cur.execute(query)
 data = cur.fetchall()
 colnames = [cn[0] for cn in cur.description]
 sleep_start_time_with_week = pd.DataFrame(data, columns=colnames)
 
 
-
-
+# calculate weekly aggregated statistics
 weekly_avg_df = sleep_start_time_with_week.groupby('week').mean().reset_index()
 weekly_std_df = sleep_start_time_with_week.groupby('week').std().reset_index()
 weekly_stats_df = weekly_avg_df.merge(weekly_std_df, on='week')
@@ -55,7 +60,7 @@ weekly_stats_df['comp'] = weekly_stats_df['std'].apply(get_pct_change_from_overa
 
 
 
-
+# generate and save a boxplot
 fig = plt.figure(figsize=(10,3))
 grid = plt.GridSpec(1,1)
 ax1 = plt.subplot(grid[0,0])
